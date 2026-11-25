@@ -1,112 +1,51 @@
-import {catalog} from './catalog.mjs';
-import {fit} from './calibration.mjs';
-
-const get = id => document.getElementById(id);
-const manufacturer = catalog[0];
-const model = get('model');
-const body = get('points');
-const query = new URLSearchParams(location.search);
-const number = new Intl.NumberFormat('de-CH', {maximumSignificantDigits: 10});
-let report;
-
-function invalidate() {
-  report = undefined;
-  get('status').textContent = 'Berechne zuerst Gain und Offset.';
-  get('result').hidden = true;
-  get('check').hidden = true;
-  get('export').disabled = true;
-}
-
-function appendPoint(raw = '', reference = '') {
-  const row = body.insertRow();
-  const index = body.rows.length;
-  const heading = document.createElement('th');
-  heading.scope = 'row';
-  heading.textContent = index;
-  row.append(heading);
-  for (const [label, value] of [['Rohwert', raw], ['Referenz', reference]]) {
-    const field = document.createElement('input');
-    field.type = 'number';
-    field.step = 'any';
-    field.required = true;
-    field.value = value;
-    field.setAttribute('aria-label', `${label} Punkt ${index}`);
-    row.insertCell().append(field);
-  }
-  get('remove').disabled = index <= 2;
-}
-
-function updateModel() {
-  get('modelStatus').textContent = `${model.selectedOptions[0].text} · Simulation verfügbar. Hardwaretreiber in Vorbereitung.`;
-  const url = new URL(location.href);
-  url.searchParams.set('model', model.value);
-  history.replaceState(null, '', url);
-  body.replaceChildren();
-  appendPoint();
-  appendPoint();
-  get('checkRaw').value = '';
-  invalidate();
-}
-
-function selectModels(group, requested) {
-  model.replaceChildren();
-  for (const item of group.models) model.add(new Option(item.name, item.id));
-  if (group.models.some(item => item.id === requested)) model.value = requested;
-  updateModel();
-}
-
-model.addEventListener('change', updateModel);
-get('add').addEventListener('click', () => { appendPoint(); invalidate(); });
-get('remove').addEventListener('click', () => {
-  if (body.rows.length > 2) body.deleteRow(-1);
-  get('remove').disabled = body.rows.length <= 2;
-  invalidate();
-});
-get('example').addEventListener('click', () => {
-  body.replaceChildren();
-  appendPoint(1200, 0);
-  appendPoint(5202, 50);
-  appendPoint(9200, 100);
-  invalidate();
-});
-body.addEventListener('input', invalidate);
-
-function updateCheck() {
-  const raw = get('checkRaw').valueAsNumber;
-  const estimate = report ? raw * report.fit.gain + report.fit.offset : NaN;
-  get('checkResult').textContent = Number.isFinite(estimate) ? number.format(estimate) : '—';
-}
-
-get('calibration').addEventListener('submit', event => {
-  event.preventDefault();
-  invalidate();
-  const points = Array.from(body.rows, row => {
-    const [raw, reference] = row.querySelectorAll('input');
-    return {raw: raw.valueAsNumber, reference: reference.valueAsNumber};
-  });
-  try {
-    const result = fit(points);
-    report = {mode: 'simulation', manufacturer: manufacturer.id, model: model.value, points, fit: result};
-    get('gain').textContent = number.format(result.gain);
-    get('offset').textContent = number.format(result.offset);
-    get('error').textContent = number.format(result.residuals.reduce((max, error) => Math.max(max, Math.abs(error)), 0));
-    get('status').textContent = 'Lineares Modell berechnet: Referenz = Gain × Rohwert + Offset.';
-    get('result').hidden = false;
-    get('check').hidden = false;
-    get('export').disabled = false;
-    updateCheck();
-  } catch (error) {
-    get('status').textContent = error.message;
-  }
-});
-
-get('checkRaw').addEventListener('input', updateCheck);
-get('export').addEventListener('click', () => {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], {type: 'application/json'}));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'ssc-simulation.json';
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-});
-selectModels(manufacturer, query.get('model'));
+import {catalog,pga,registers} from './catalog.mjs';
+import {fitSurface,predict,verify,fitTemperature,makePlan,afeEstimate,signed16} from './engine.mjs';
+import {ReadBridge} from './bridge.mjs';
+const $=id=>document.getElementById(id),num=id=>$(id).valueAsNumber,sel=id=>Number($(id).value),txt=(id,s)=>$(id).textContent=s,fmt=n=>Number.isFinite(n)?Number(n.toPrecision(8)).toString():'—';
+const bridge=new ReadBridge(),models=catalog[0].models,steps=['Start','Verbindung','Messkonzept','AFE / Temperatur','Messpunkte','Verifikation','Ausgang / Diagnose','Archiv'];let page=0,fitResult=null,checks=[],source='manual',tempResult=null,afeResult=null,latest=null,fitSettings=null;
+function show(n){page=Math.max(0,Math.min(7,n));document.querySelectorAll('[data-page]').forEach(s=>s.hidden=+s.dataset.page!==page);document.querySelectorAll('#nav button').forEach((b,i)=>{b.classList.toggle('active',i===page);if(i===page)b.setAttribute('aria-current','step');else b.removeAttribute('aria-current');});$('prev').disabled=page===0;$('next').disabled=page===7;txt('progress',page===0?'Aufgabe wählen':page+' / 7');if(page===7)summary();}
+function button(label,fn){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=fn;return b;}
+steps.forEach((s,i)=>$('nav').append(button((i?i+' · ':'')+s,()=>show(i))));
+[['Geführte Kalibrierung','Messkonzept, AFE und Abgleich',1],['Ausgang','Sollkennlinie berechnen',6],['Register / Diagnose','Experimentelles USB-Lesen',1],['Messung / Logging','Manuelle Einzelmessungen erfassen',4],['Nachmessung','Toleranz und Fehlerkurve',5],['Archiv','JSON, CSV und Druckansicht',7]].forEach(([a,b,i])=>{let el=button(a,()=>show(i));let sub=document.createElement('small');sub.textContent=b;el.append(sub);$('tiles').append(el);});
+$('prev').onclick=()=>show(page-1);$('next').onclick=()=>show(page+1);
+try{document.documentElement.dataset.theme=localStorage.getItem('adi-theme')||'light'}catch{}
+$('theme').onclick=()=>{let t=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=t;try{localStorage.setItem('adi-theme',t)}catch{}};
+models.forEach(m=>$('model').add(new Option(m.name,m.id)));const requested=new URLSearchParams(location.search).get('model');$('model').value=models.some(m=>m.id===requested)?requested:'max40109';
+pga.forEach(g=>$('pga').add(new Option(g,g)));$('pga').value='72';
+function model(){return models.find(m=>m.id===$('model').value)}
+function updateModel(){const m=model();txt('modelInfo',m.description);$('datasheet').href=m.datasheet;$('adapter').options[1].disabled=!m.readOnly;if(!m.readOnly){$('adapter').value='manual';$('to').value='0';$('po').value='1';$('tc').value='1';}$('to').disabled=$('po').disabled=$('tc').disabled=!m.readOnly;$('tempFit').disabled=!m.readOnly;let u=new URL(location.href);u.searchParams.set('model',m.id);history.replaceState(null,'',u);buttons();}
+function buttons(){let active=!!bridge.port;$('connect').disabled=active||!model().readOnly||$('adapter').value!=='bridge';$('disconnect').disabled=!active;$('read').disabled=$('readDiag').disabled=!active;$('model').disabled=active;$('adapter').disabled=active;}
+function invalidateCheck(){checks=[];txt('pass','—');txt('verifyStatus','Erneute Prüfung erforderlich.');txt('checkResult','');$('graph').replaceChildren();}
+function invalidate(){fitResult=null;fitSettings=null;invalidateCheck();txt('maxError','—');txt('count','—');txt('coeff','Noch keine Berechnung.');txt('fitStatus','Messwerte oder Einstellungen geändert. Neu berechnen.');}
+function resetRows(){for(const id of ['points','checks'])$(id).replaceChildren();source='manual';invalidate();}
+$('model').onchange=()=>{resetRows();tempResult=null;afeResult=null;txt('tempResult','—');txt('afeResult','—');updateModel();};
+$('adapter').onchange=buttons;
+$('connect').onclick=async()=>{ $('connect').disabled=true;try{await bridge.connect();await bridge.read('HELLO');txt('connection','Lesebridge verbunden');txt('usb','Adapter bestätigt; Chipidentität nicht geprüft.');}catch(e){txt('usb',e.message);try{await bridge.close()}catch{}}finally{buttons();}};
+$('disconnect').onclick=async()=>{try{await bridge.close();latest=null;txt('connection','Nicht verbunden');txt('liveP','—');txt('liveT','—');txt('usb','Getrennt.');}catch(e){txt('usb',e.message)}buttons();};
+async function readAll(){if(!bridge.port)throw Error('Lesebridge nicht verbunden');const values=[];for(const [r,name] of registers){const hex=r.toString(16).toUpperCase().padStart(2,'0');let word=await bridge.read('READ '+hex);values.push({name,address:hex,word,code:signed16(word)});}latest=values;txt('liveP',values[0].code);txt('liveT',values[1].code);txt('registers',values.map(v=>v.address+'  '+v.name+'  0x'+v.word.toString(16).padStart(4,'0')+'  '+v.code).join('\n'));return values;}
+async function readClick(){try{await readAll();txt('usb','Register gelesen; keine Frische-/Chipidentitätsgarantie.');}catch(e){txt('usb',e.message);txt('registers',e.message)}}
+$('read').onclick=$('readDiag').onclick=readClick;
+function row(id,p={}){const tr=$(id).insertRow();for(const key of ['reference','temperature','raw','temp']){const f=document.createElement('input');f.type='number';f.step='any';f.value=p[key]??'';f.setAttribute('aria-label',key);f.oninput=id==='points'?invalidate:invalidateCheck;tr.insertCell().append(f);}
+ tr.insertCell().append(button('USB lesen',async()=>{try{let v=await readAll();let f=tr.querySelectorAll('input');f[2].value=v[0].code;f[3].value=v[1].code;id==='points'?invalidate():invalidateCheck();if(source==='manual')source='mixed/manual+usb';txt('usb','Codes übernommen; Aktualität extern prüfen.');}catch(e){txt(id==='points'?'fitStatus':'verifyStatus',e.message)}}));
+ tr.insertCell().append(button('×',()=>{tr.remove();id==='points'?invalidate():invalidateCheck()}));}
+function data(id){return Array.from($(id).rows,tr=>{const [reference,temperature,raw,temp]=Array.from(tr.querySelectorAll('input'),f=>f.valueAsNumber);return {reference,temperature,raw,temp};})}
+function plan(){const p=makePlan(num('lo'),num('hi'),sel('pc'),sel('tc'),num('tl'),num('th'));if(sel('po')>=sel('pc')||sel('to')>=sel('tc'))throw Error('Ordnung muss kleiner als Zahl der jeweiligen Stützstellen sein');return p;}
+$('plan').onclick=()=>{try{let p=plan();resetRows();p.forEach(x=>row('points',x));txt('planInfo',p.length+' Punkte vorbereitet.');show(3);}catch(e){txt('planInfo',e.message)}};
+$('add').onclick=()=>{row('points');invalidate()};$('addCheck').onclick=()=>{row('checks');invalidateCheck()};
+for(const id of ['unit','lo','hi','pc','tc','tl','th','po','to'])$(id).addEventListener('change',invalidate);
+for(const id of ['bo','bs','drive','pga','limit'])$(id).addEventListener('change',()=>{afeResult=null;txt('afeResult','—');invalidate()});
+$('afe').onclick=()=>{try{afeResult=afeEstimate(num('bo'),num('bs'),num('drive'),sel('pga'),num('limit'));txt('afeResult','V0 = '+fmt(afeResult.a)+' V · V1 = '+fmt(afeResult.b)+' V\nSpanne = '+fmt(afeResult.span)+' V · Ausnutzung = '+fmt(afeResult.utilization)+' %\n'+(afeResult.utilization>100?'Grenze überschritten':'Innerhalb der gewählten idealisierten Grenze'));}catch(e){afeResult=null;txt('afeResult',e.message)}};
+for(const id of ['tempData','tempOrder'])$(id).oninput=()=>{tempResult=null;txt('tempResult','—')};
+$('tempFit').onclick=()=>{try{const p=$('tempData').value.trim().split(/\n/).map(l=>{let a=l.split(';');if(a.length!==2||a.some(s=>!s.trim()))throw Error('Zwei vollständige Werte je Zeile erforderlich');return {raw:Number(a[0]),reference:Number(a[1])}});tempResult=fitTemperature(p,sel('tempOrder'));txt('tempResult',tempResult.k.map((v,i)=>'k'+i+' = '+fmt(v)).join('\n')+'\nHost-Modell in °C, keine Chipkodierung.');}catch(e){tempResult=null;txt('tempResult',e.message)}};
+$('demo').onclick=()=>{try{let p=plan();resetRows();source='synthetic';p.forEach(x=>{let f=(x.reference-num('lo'))/(num('hi')-num('lo')),t=sel('tc')===1?0:(x.temperature-num('tl'))/(num('th')-num('tl'));row('points',{...x,raw:Math.round(-12000+24000*f+300*t+200*f*t),temp:Math.round(-10000+20000*t)})});txt('fitStatus','Synthetische Beispieldaten – keine reale Messung.');}catch(e){txt('fitStatus',e.message)}};
+$('fit').onclick=()=>{invalidate();try{if(!(num('hi')>num('lo')))throw Error('Messbereich ungültig');let p=data('points');if(p.some(x=>!Number.isFinite(x.reference)||!Number.isFinite(x.raw)))throw Error('Rohwerte und Referenzen vervollständigen');fitResult=fitSurface(p,sel('po'),sel('to'),model().id);fitSettings={unit:$('unit').value,lo:num('lo'),hi:num('hi'),source,points:p};txt('maxError',fmt(Math.max(...fitResult.residuals.map(Math.abs)))+' '+fitSettings.unit);txt('count',fitResult.coefficients.length);txt('coeff',fitResult.coefficients.map((v,i)=>'c'+Math.floor(i/(fitResult.to+1))+','+(i%(fitResult.to+1))+' = '+fmt(v)).join('\n'));txt('fitStatus','Host-Modell berechnet · '+source);show(5);}catch(e){txt('fitStatus',e.message)}};
+$('tol').oninput=invalidateCheck;
+$('verify').onclick=()=>{invalidateCheck();try{if(!fitResult)throw Error('Zuerst Koeffizienten berechnen');let p=data('checks');if(p.some(a=>fitSettings.points.some(b=>a.raw===b.raw&&(!fitResult.to||a.temp===b.temp))))throw Error('Prüfrohwerte müssen unabhängig von den Kalibrierpunkten sein');checks=verify(fitResult,p,fitSettings.lo,fitSettings.hi,num('tol'));txt('pass',checks.every(p=>p.pass)?'Bestanden*':'Nicht bestanden');txt('verifyStatus','* Host-Prüfung, keine Hardwarefreigabe. Quelle: '+source);txt('checkResult',checks.map(p=>fmt(p.reference)+' → '+fmt(p.predicted)+' | '+fmt(p.percent)+' % FS | '+(p.pass?'OK':'NOK')).join('\n'));graph();}catch(e){txt('verifyStatus',e.message)}};
+function graph(){const svg=$('graph'),ns='http://www.w3.org/2000/svg',max=Math.max(.001,num('tol')*1.3,...checks.map(p=>Math.abs(p.percent)*1.1)),y=v=>110-v/max*85,x=v=>55+520*(v-fitSettings.lo)/(fitSettings.hi-fitSettings.lo);function el(tag,attrs){let e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);svg.append(e);return e;}for(const v of [-num('tol'),0,num('tol')])el('line',{x1:45,x2:585,y1:y(v),y2:y(v),stroke:'currentColor','stroke-dasharray':v?'5 4':'0',opacity:.6});for(const p of checks){el('circle',{cx:Math.max(45,Math.min(585,x(p.reference))),cy:y(p.percent),r:5,fill:p.pass?'#21936c':'#c34350'});}el('text',{x:45,y:18,fill:'currentColor','font-size':12}).textContent='Fehler % FS · ±'+num('tol');el('text',{x:45,y:218,fill:'currentColor','font-size':12}).textContent='Referenz '+fitSettings.lo+' bis '+fitSettings.hi+' '+fitSettings.unit;}
+$('output').onclick=()=>{let a=num('outLo'),b=num('outHi'),p=num('outPct');txt('outResult',[a,b,p].every(Number.isFinite)&&p>=0&&p<=100?fmt(a+(b-a)*p/100)+' '+$('outUnit').value+' (Sollwert)':'Ungültige Eingabe')};
+function report(){return {version:'0.2.0',time:new Date().toISOString(),model:model().id,sensor:$('sensor').value,mode:'host-only',source,settings:fitSettings,fit:fitResult,temperatureFit:tempResult,afe:afeResult,checks,tolerancePercentFS:num('tol'),lastRegisters:latest,hardwareWrite:false};}
+function summary(){const r=report();txt('summary',JSON.stringify(r,null,2));}
+function download(name,content,type){const url=URL.createObjectURL(new Blob([content],{type}));let a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+$('export').onclick=()=>download(model().id+'-host-report.json',JSON.stringify(report(),null,2),'application/json');
+$('csv').onclick=()=>{if(!checks.length){txt('summary','Zuerst unabhängige Prüfpunkte auswerten.');return;}download(model().id+'-verification.csv','reference;rawP;rawT;predicted;error;percentFS;pass\n'+checks.map(p=>[p.reference,p.raw,p.temp,p.predicted,p.error,p.percent,p.pass].join(';')).join('\n'),'text/csv')};
+$('print').onclick=()=>{summary();window.print()};updateModel();row('points',{reference:0,temperature:25});row('points',{reference:100,temperature:25});show(0);
