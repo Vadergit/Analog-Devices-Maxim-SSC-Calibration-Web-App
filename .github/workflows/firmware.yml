@@ -1,4 +1,4 @@
-name: ESP32-C3 firmware build
+name: ESP32-C3 and Pro Micro firmware builds
 on:
   push:
     paths: ['firmware/**', '.github/workflows/firmware.yml']
@@ -6,7 +6,7 @@ on:
     paths: ['firmware/**', '.github/workflows/firmware.yml']
   workflow_dispatch:
 jobs:
-  build:
+  esp32:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,5 +16,20 @@ jobs:
       - run: arduino-cli compile --fqbn esp32:esp32:esp32c3:CDCOnBoot=cdc --output-dir build firmware/esp32c3_max40109
       - uses: actions/upload-artifact@v4
         with:
-          name: max40109-esp32c3-firmware
+          name: max40109-esp32c3-firmware-v4
+          path: build/
+  promicro:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cpu: [16MHzatmega32U4, 8MHzatmega32U4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - run: arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/master/IDE_Board_Manager/package_sparkfun_index.json
+      - run: arduino-cli core install SparkFun:avr --additional-urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/master/IDE_Board_Manager/package_sparkfun_index.json
+      - run: arduino-cli compile --fqbn SparkFun:avr:promicro:cpu=${{ matrix.cpu }} --output-dir build firmware/promicro_max40109
+      - uses: actions/upload-artifact@v4
+        with:
+          name: max40109-promicro-${{ matrix.cpu }}-v4
           path: build/

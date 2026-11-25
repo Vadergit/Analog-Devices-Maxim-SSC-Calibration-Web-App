@@ -42,3 +42,7 @@ Flash `firmware/esp32c3_max40109/esp32c3_max40109.ino` (ESP32-C3, USB CDC, SDA G
 ## v0.5.0 — DSP prototype and browser fixes
 
 Firmware v3, GPIO6 DQ via suitable external pull-up/level translator, single MAX40109 on bus. ROM command reads family 0x76 and verifies CRC8; no full 1-Wire register transport or PLC. I2C is still required for register accesses. Experimental pressure-only shadow writes 0x08–0x27 after verified backup, ROM, host verification and explicit confirmation. No MTP burn or charge pump initialization. Rev.3 pp.36–37 contain conflicting coefficient descriptions (fixed point tables vs IEEE754 DSP diagram; POR value 1 also ambiguous). The UI requires explicit candidate encoding selection; none is validated. Real hardware test and manufacturer golden values are required before production. Use cold start to restore permanent contents after incomplete transfer. Prototype access sequence itself needs testing, including whether manufacturer initialization is necessary. Firmware v3 requires flashing again.
+
+## v0.6.0 — Adapter support
+
+ESP32-C3 and Pro Micro share protocol v4 with INFO identity. MAX40109 EV Kit external bus connection is selectable with wiring confirmation. Original MAX32666FTHR USB and MAX1454EVSYS native driver remain open. [Protocol and wiring](firmware/PROTOCOL.md). Flash firmware v4. No real hardware validation.
