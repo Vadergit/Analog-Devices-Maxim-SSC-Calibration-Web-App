@@ -12,5 +12,7 @@ export class ReadBridge {
  dump(){return this.run(async()=>parseDump(await this.exchange('DUMP',/^OK DUMP(?: [0-9A-F]{4}){69}$/,12000)));}
  patch(a,m,v){validPatch(a,m,v);return this.run(async()=>parseInt((await this.exchange('PATCH '+hex(a)+' '+hex(m,4)+' '+hex(v,4),new RegExp('^OK PATCH '+hex(a)+' [0-9A-F]{4}$'))).slice(-4),16));}
  rom(){return this.run(async()=>verifyRom((await this.exchange('ROM',/^OK ROM [0-9A-F]{16}$/)).slice(7)));}
- shadow(a,v){if(!Number.isInteger(a)||a<8||a>39||!Number.isInteger(v)||v<0||v>65535)throw Error('Nur Druckkoeffizienten im Shadow');return this.run(async()=>parseInt((await this.exchange('SHADOW '+hex(a)+' '+hex(v,4),new RegExp('^OK SHADOW '+hex(a)+' [0-9A-F]{4}))).slice(-4),16));}
+ shadow(a,v){if(!Number.isInteger(a)||a<8||a>39||!Number.isInteger(v)||v<0||v>65535)throw Error('Nur Druckkoeffizienten im Shadow');return this.run(async()=>parseInt((await this.exchange('SHADOW '+hex(a)+' '+hex(v,4),new RegExp('^OK SHADOW '+hex(a)+' [0-9A-F]{4}.slice(-4),16));}
+}
+))).slice(-4),16));}
 }
