@@ -1,10 +1,10 @@
 import {test,expect} from '@playwright/test';
 test('Elmos-style home, guided calibration, verification and archive',async({page})=>{
- const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ page.setDefaultTimeout(5000);const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.error('PAGE ERROR',e.message)});
  await page.goto('http://127.0.0.1:8000/');
  await expect(page.locator('#tiles .gw-choice')).toHaveCount(8);
  await expect(page.locator('#nav .gw-sideitem')).toHaveCount(11);
- await page.getByRole('button',{name:'Sensor neu abgleichen'}).click();
+ await page.locator('[data-task="calibration"]').click();
  await page.locator('[data-preset="quick"]').click();
  await page.locator('#next').click();
  await page.locator('#plan').click();
@@ -20,7 +20,7 @@ test('Elmos-style home, guided calibration, verification and archive',async({pag
  await page.locator('#verify').click();
  await expect(page.locator('#verifyStatus')).toContainText('Host-Prüfung');
  await page.locator('#guidedHomeTop').click();
- await page.getByRole('button',{name:'Archiv',exact:false}).first().click();
+ await page.locator('[data-task="archive"]').click();
  await page.locator('#saveArchive').click();
  await expect(page.locator('#archiveList')).toContainText('max40109');
  await page.locator('#settingsOpen').click();
@@ -28,3 +28,5 @@ test('Elmos-style home, guided calibration, verification and archive',async({pag
  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
  expect(errors).toEqual([]);
 });
+
+test('hardware viewer fields, offline guard and RAM controls',async({page})=>{page.setDefaultTimeout(5000);await page.goto('http://127.0.0.1:8000/');await page.locator('#connectionToggle').click();await expect(page.locator('#mtpRead')).toBeVisible();await page.locator('#mtpRead').click();await expect(page.locator('#hwStatus')).toContainText('verbinden');await page.locator('#guidedHomeTop').click();await page.locator('[data-task="nvm"]').click();await expect(page.locator('#applyGain')).toBeVisible();});
