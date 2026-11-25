@@ -27,3 +27,5 @@ ERR + message on failure. PATCH volatile register write with readback; SHADOW ex
 | GND | GND | GND | DGND |
 
 Verify pull-up voltage and use suitable bidirectional level shifting; ESP32-C3 and 3.3 V Pro Micro are not 5 V tolerant. AVR internal pull-ups may be enabled by Wire; use translator if voltages differ. Stock MAX32666FTHR USB protocol not documented in the available guide; no native OEM USB driver. MAX1454EVSYS is a different interface and remains unsupported. External mode does not require replacing OEM firmware. Hardware validation pending.
+
+In the web app, explicitly confirm the DQ pull-up and removal of the fixed-high connection before ROM commands or experimental DSP operations that use ROM identity. This confirmation is not an electrical test.
