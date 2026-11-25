@@ -33,3 +33,5 @@ In the web app, explicitly confirm the DQ pull-up and removal of the fixed-high 
 ## Protocol v5
 
 HELLO returns MAX40109-RO 5; INFO includes protocol 5 (same capabilities string). SCAN returns OK SCAN with zero or more 7-bit I2C addresses, isolated bus only. FRESH clears pressure-ready flag 0x0100, waits bounded time for new flag, reads ADC_P; hardware verification required. OWREAD aa uses ROM match and read function 0x33, length minus one; experimental standard slots, compare with I2C before reliance. No full 1-Wire write path. DQ wiring confirmation mandatory. Neither ADC freshness nor timing is validated on hardware.
+
+Protocol v5 also permits SHADOW 00–27h (all 20 coefficient words as 40 halfwords). Configuration, scratchpad, lock and address words remain protected. The DSP candidate uses signed raw-code input convention; alternative formats explicitly selectable. Permanent burn is only planned, no execution command. MTP count, status and protected-range checks are mandatory for the preview.

@@ -50,3 +50,5 @@ ESP32-C3 and Pro Micro share protocol v4 with INFO identity. MAX40109 EV Kit ext
 ## v0.7.0 — Lab diagnostic expansion
 
 I2C discovery, bounded fresh pressure read, experimental 1-Wire register comparison, two-endpoint PGA recommendation with clipping and headroom checks, MTP status/rest-count and clipping/diagnostic decode, manual cold-start comparison, manual DMM output verification CSV. Protocol v5 for both adapters. OEM host USB, PLC electrical hardware, MAX1454, permanent MTP burn, full calibrated temperature transfer and production qualification remain open. All test features require a lab sensor and safe wiring.
+
+DSP candidate expanded: polynomial up to third order, optional calibrated temperature codes and recalculated pressure surface with quantized temperature input, quantization residuals, experimental shadow transfer of all 40 calibration halfwords, dry-run MTP programming plan with count/status/lock checks. Raw-code convention and encoding remain unverified on actual silicon. No persistent burn.

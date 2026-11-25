@@ -36,7 +36,7 @@ bool readRom(uint8_t *b){if(!owReset())return false;owWrite(0x33);for(int i=0;i<
 // Experimental transport: standard LSB-first slots; field framing/byte order must be checked on hardware.
 bool owRegRead(uint8_t a,uint8_t n,uint16_t &v){uint8_t uid[8];if(!readRom(uid)||!owReset())return false;owWrite(0x55);for(auto b:uid)owWrite(b);owWrite(0x33);owWrite(a);owWrite(n-1);v=owRead();if(n==2)v=(v<<8)|owRead();return true;}
 bool freshPressure(uint16_t &v){uint16_t status;if(!rd(2,2,status))return false;if(!wr(2,2,0x0100))return false;uint32_t start=millis();do{if(!rd(2,2,status))return false;if(status&0x0100)return rd(6,2,v);delay(2);}while(millis()-start<1800);return false;}
-bool shadowWrite(uint8_t a,uint16_t value,uint16_t &actual){uint16_t c,ctrl;if(a<8||a>39||!rd(0,2,c)||(c&0x8000)||!rd(0xa2,1,ctrl)||ctrl!=0)return false;if(!wr(0xa2,1,0x10))return false;bool ok=wr(0xa4,1,a)&&wr(0xa5,2,value)&&rd(0xa7,2,actual)&&actual==value;if(!wr(0xa2,1,0))ok=false;return ok;}
+bool shadowWrite(uint8_t a,uint16_t value,uint16_t &actual){uint16_t c,ctrl;if(a>39||!rd(0,2,c)||(c&0x8000)||!rd(0xa2,1,ctrl)||ctrl!=0)return false;if(!wr(0xa2,1,0x10))return false;bool ok=wr(0xa4,1,a)&&wr(0xa5,2,value)&&rd(0xa7,2,actual)&&actual==value;if(!wr(0xa2,1,0))ok=false;return ok;}
 void command(){unsigned a,m,v;uint16_t old,actual;
  if(!strcmp(line,"HELLO")){Serial.println(F("MAX40109-RO 5"));return;}
  if(!strcmp(line,"INFO")){Serial.println(F("OK INFO " BOARD_ID " 5 I2C,ROM,RAM,MTP,SHADOW"));return;}
