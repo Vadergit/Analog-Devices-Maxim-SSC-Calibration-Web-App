@@ -21,12 +21,14 @@ jobs:
   promicro:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         cpu: [16MHzatmega32U4, 8MHzatmega32U4]
     steps:
       - uses: actions/checkout@v4
       - uses: arduino/setup-arduino-cli@v2
       - run: arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/master/IDE_Board_Manager/package_sparkfun_index.json
+      - run: arduino-cli core install arduino:avr@1.8.6
       - run: arduino-cli core install SparkFun:avr --additional-urls https://raw.githubusercontent.com/sparkfun/Arduino_Boards/master/IDE_Board_Manager/package_sparkfun_index.json
       - run: arduino-cli compile --fqbn SparkFun:avr:promicro:cpu=${{ matrix.cpu }} --output-dir build firmware/promicro_max40109
       - uses: actions/upload-artifact@v4
