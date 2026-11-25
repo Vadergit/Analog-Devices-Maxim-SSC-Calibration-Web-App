@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {ramMap,mtpMap,pgaCodes,decodeStatus,decodeConfig,diffWords,parseDump,validPatch} from '../max40109.mjs';
+test('register widths and PGA',()=>{assert.equal(ramMap.find(x=>x[0]===4)[1],1);assert.equal(ramMap.find(x=>x[0]===6)[1],2);assert.equal(mtpMap.length,69);assert.equal(pgaCodes.get(5),15);assert.equal(pgaCodes.get(2520),19)});
+test('MTP readback',()=>{let a=Array(69).fill(0),b=[...a];b[68]=0x804d;assert.equal(decodeConfig(b).locked,true);assert.equal(diffWords(a,b)[0].address,68);assert.deepEqual(parseDump('OK DUMP'+' 0000'.repeat(69)),a);assert.throws(()=>parseDump('OK DUMP 0000'))});
+test('RAM whitelist',()=>{assert.equal(validPatch(4,63,6),true);assert.throws(()=>validPatch(162,1,1));assert.throws(()=>validPatch(0,128,128));assert.throws(()=>validPatch(4,63,32));assert.throws(()=>validPatch(30,15,1));assert.deepEqual(decodeStatus(0x900),['Pressure ready','DRV fault'])});

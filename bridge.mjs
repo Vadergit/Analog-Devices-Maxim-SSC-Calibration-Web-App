@@ -1,23 +1,13 @@
-// Explicit read-only protocol for bundled firmware. No write command.
-export class ReadBridge{
- constructor(){this.port=null;this.busy=false;}
- async connect(){if(!navigator.serial)throw Error('Web Serial benötigt Chrome/Edge und HTTPS oder localhost');if(this.port)throw Error('Bereits verbunden');const p=await navigator.serial.requestPort();await p.open({baudRate:115200});this.port=p;}
- async close(){if(this.busy)throw Error('Messung läuft');if(this.port){await this.port.close();this.port=null;}}
- async read(command){
-  if(!this.port||this.busy||! /^(HELLO|READ (06|08|0F|11))$/.test(command))throw Error('Nur freigegebene Leseoperationen möglich');
-  this.busy=true;let reader,writer,timer;
-  try{
-   reader=this.port.readable.getReader();writer=this.port.writable.getWriter();
-   timer=setTimeout(()=>{reader.cancel().catch(()=>{});},2500);
-   await writer.write(new TextEncoder().encode(command+'\n'));
-   let buffer='',decoder=new TextDecoder();
-   while(true){let {value,done}=await reader.read();if(done)throw Error('Timeout oder USB-Verbindung unterbrochen');buffer+=decoder.decode(value,{stream:true});if(buffer.length>4096)throw Error('Ungültige Antwort');
-    let idx;while((idx=buffer.indexOf('\n'))>=0){let line=buffer.slice(0,idx).trim();buffer=buffer.slice(idx+1);
-     if(line.startsWith('ERR '))throw Error(line);
-     if(command==='HELLO'&&line==='MAX40109-RO 1')return line;
-     if(command.startsWith('READ')&&new RegExp('^OK '+command.slice(5)+' [0-9A-F]{4}$').test(line))return parseInt(line.slice(-4),16);
-    }
-   }
-  }finally{clearTimeout(timer);reader?.releaseLock();writer?.releaseLock();this.busy=false;}
- }
+import {hex,parseDump,validPatch} from './max40109.mjs';
+export class ReadBridge {
+ constructor(){this.port=null;this.busy=false;this.queue=Promise.resolve();this.buffer='';}
+ async connect(){if(!navigator.serial)throw Error('Web Serial benötigt Chrome/Edge und HTTPS oder localhost');if(this.port)throw Error('Bereits verbunden');let p=await navigator.serial.requestPort();await p.open({baudRate:115200});this.port=p;this.reader=p.readable.getReader();this.writer=p.writable.getWriter();this.decoder=new TextDecoder();this.buffer='';}
+ async close(){if(this.busy)throw Error('Messung läuft');await this.shutdown();}
+ async shutdown(){let p=this.port;this.port=null;try{await this.reader?.cancel()}catch{}try{this.reader?.releaseLock()}catch{}try{this.writer?.releaseLock()}catch{}try{await p?.close()}catch{}this.buffer='';}
+ async exchange(cmd,pattern,timeout=3000){if(!this.port)throw Error('Nicht verbunden');this.busy=true;let timer;try{await this.writer.write(new TextEncoder().encode(cmd+'\n'));const read=async()=>{for(;;){let i;while((i=this.buffer.indexOf('\n'))>=0){let s=this.buffer.slice(0,i).trim();this.buffer=this.buffer.slice(i+1);if(s.startsWith('ERR '))throw Error(s);if(pattern.test(s))return s;}let {value,done}=await this.reader.read();if(done)throw Error('USB getrennt');this.buffer+=this.decoder.decode(value,{stream:true});if(this.buffer.length>8192)throw Error('Antwort zu lang');}};return await Promise.race([read(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Timeout: '+cmd)),timeout)})]);}catch(e){await this.shutdown();throw e;}finally{clearTimeout(timer);this.busy=false;}}
+ run(fn){let p=this.queue.then(fn);this.queue=p.catch(()=>{});return p;}
+ read(cmd){if(cmd==='HELLO')return this.run(()=>this.exchange(cmd,/^MAX40109-RO 2$/));if(!/^READ [0-9A-F]{2}$/.test(cmd))throw Error('Ungültiger Befehl');return this.run(async()=>parseInt((await this.exchange(cmd,new RegExp('^OK '+cmd.slice(5)+' [0-9A-F]{4}$'))).slice(-4),16));}
+ probe(a){if(!Number.isInteger(a)||a<8||a>119)throw Error('I2C-Adresse ungültig');return this.run(()=>this.exchange('PROBE '+hex(a),/^OK PROBE [0-9A-F]{2}$/));}
+ dump(){return this.run(async()=>parseDump(await this.exchange('DUMP',/^OK DUMP(?: [0-9A-F]{4}){69}$/,12000)));}
+ patch(a,m,v){validPatch(a,m,v);return this.run(async()=>parseInt((await this.exchange('PATCH '+hex(a)+' '+hex(m,4)+' '+hex(v,4),new RegExp('^OK PATCH '+hex(a)+' [0-9A-F]{4}$'))).slice(-4),16));}
 }

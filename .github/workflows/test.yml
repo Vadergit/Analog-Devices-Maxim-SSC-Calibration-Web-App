@@ -10,7 +10,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check app.mjs && node --check bridge.mjs && node --test tests/engine.test.mjs
+      - run: node --check app.mjs && node --check bridge.mjs && node --check max40109.mjs && node --test tests/*.test.mjs
 
       - run: npm install --no-save @playwright/test
       - run: npx playwright install --with-deps chromium
