@@ -32,10 +32,17 @@ void owWrite(uint8_t b){for(int i=0;i<8;i++)owWriteBit((b>>i)&1);}
 uint8_t owRead(){uint8_t b=0;for(int i=0;i<8;i++)if(owReadBit())b|=1<<i;return b;}
 uint8_t crc8(const uint8_t *b,size_t n){uint8_t c=0;while(n--){uint8_t x=*b++;for(int i=0;i<8;i++){bool z=(c^x)&1;c>>=1;if(z)c^=0x8c;x>>=1;}}return c;}
 bool readRom(uint8_t *b){if(!owReset())return false;owWrite(0x33);for(int i=0;i<8;i++)b[i]=owRead();return b[0]==0x76&&crc8(b,8)==0;}
+// Rev.3 p.49: match ROM, READ 33h, address, length-1, data bytes.
+// Experimental transport: standard LSB-first slots; field framing/byte order must be checked on hardware.
+bool owRegRead(uint8_t a,uint8_t n,uint16_t &v){uint8_t uid[8];if(!readRom(uid)||!owReset())return false;owWrite(0x55);for(auto b:uid)owWrite(b);owWrite(0x33);owWrite(a);owWrite(n-1);v=owRead();if(n==2)v=(v<<8)|owRead();return true;}
+bool freshPressure(uint16_t &v){uint16_t status;if(!rd(2,2,status))return false;if(!wr(2,2,0x0100))return false;uint32_t start=millis();do{if(!rd(2,2,status))return false;if(status&0x0100)return rd(6,2,v);delay(2);}while(millis()-start<1800);return false;}
 bool shadowWrite(uint8_t a,uint16_t value,uint16_t &actual){uint16_t c,ctrl;if(a<8||a>39||!rd(0,2,c)||(c&0x8000)||!rd(0xa2,1,ctrl)||ctrl!=0)return false;if(!wr(0xa2,1,0x10))return false;bool ok=wr(0xa4,1,a)&&wr(0xa5,2,value)&&rd(0xa7,2,actual)&&actual==value;if(!wr(0xa2,1,0))ok=false;return ok;}
 void command(){unsigned a,m,v;uint16_t old,actual;
- if(!strcmp(line,"HELLO")){Serial.println(F("MAX40109-RO 4"));return;}
- if(!strcmp(line,"INFO")){Serial.println(F("OK INFO " BOARD_ID " 4 I2C,ROM,RAM,MTP,SHADOW"));return;}
+ if(!strcmp(line,"HELLO")){Serial.println(F("MAX40109-RO 5"));return;}
+ if(!strcmp(line,"INFO")){Serial.println(F("OK INFO " BOARD_ID " 5 I2C,ROM,RAM,MTP,SHADOW"));return;}
+ if(!strcmp(line,"SCAN")){Serial.print(F("OK SCAN"));for(uint8_t addr=8;addr<120;addr++){Wire.beginTransmission(addr);if(!Wire.endTransmission()){Serial.write(32);printHex(addr,2);}}Serial.println();return;}
+ if(!strcmp(line,"FRESH")){if(!freshPressure(actual)){error("fresh pressure timeout");return;}Serial.print(F("OK FRESH "));printHex(actual,4);Serial.println();return;}
+ if(strlen(line)==9&&!strncmp(line,"OWREAD ",7)&&parseHex(line+7,2,a)){auto r=lookup(a);if(!r||!owRegRead(a,r->n,actual)){error("1-Wire register read");return;}Serial.print(F("OK OWREAD "));printHex(a,2);Serial.write(32);printHex(actual,4);Serial.println();return;}
  if(strlen(line)==8&&!strncmp(line,"PROBE ",6)&&parseHex(line+6,2,a)&&a>=8&&a<=119){client=a;if(!rd(0,2,old)){error("I2C no response");return;}Serial.print(F("OK PROBE "));printHex(a,2);Serial.println();return;}
  if(strlen(line)==7&&!strncmp(line,"READ ",5)&&parseHex(line+5,2,a)){auto r=lookup(a);if(!r||!rd(a,r->n,old)){error("read");return;}Serial.print(F("OK "));printHex(a,2);Serial.write(32);printHex(old,4);Serial.println();return;}
  if(!strcmp(line,"ROM")){uint8_t b[8];if(!readRom(b)){error("ROM presence/family/CRC");return;}Serial.print("OK ROM ");for(auto v:b)printHex(v,2);Serial.println();return;}

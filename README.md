@@ -46,3 +46,7 @@ Firmware v3, GPIO6 DQ via suitable external pull-up/level translator, single MAX
 ## v0.6.0 — Adapter support
 
 ESP32-C3 and Pro Micro share protocol v4 with INFO identity. MAX40109 EV Kit external bus connection is selectable with wiring confirmation. Original MAX32666FTHR USB and MAX1454EVSYS native driver remain open. [Protocol and wiring](firmware/PROTOCOL.md). Flash firmware v4. No real hardware validation.
+
+## v0.7.0 — Lab diagnostic expansion
+
+I2C discovery, bounded fresh pressure read, experimental 1-Wire register comparison, two-endpoint PGA recommendation with clipping and headroom checks, MTP status/rest-count and clipping/diagnostic decode, manual cold-start comparison, manual DMM output verification CSV. Protocol v5 for both adapters. OEM host USB, PLC electrical hardware, MAX1454, permanent MTP burn, full calibrated temperature transfer and production qualification remain open. All test features require a lab sensor and safe wiring.

@@ -29,3 +29,7 @@ ERR + message on failure. PATCH volatile register write with readback; SHADOW ex
 Verify pull-up voltage and use suitable bidirectional level shifting; ESP32-C3 and 3.3 V Pro Micro are not 5 V tolerant. AVR internal pull-ups may be enabled by Wire; use translator if voltages differ. Stock MAX32666FTHR USB protocol not documented in the available guide; no native OEM USB driver. MAX1454EVSYS is a different interface and remains unsupported. External mode does not require replacing OEM firmware. Hardware validation pending.
 
 In the web app, explicitly confirm the DQ pull-up and removal of the fixed-high connection before ROM commands or experimental DSP operations that use ROM identity. This confirmation is not an electrical test.
+
+## Protocol v5
+
+HELLO returns MAX40109-RO 5; INFO includes protocol 5 (same capabilities string). SCAN returns OK SCAN with zero or more 7-bit I2C addresses, isolated bus only. FRESH clears pressure-ready flag 0x0100, waits bounded time for new flag, reads ADC_P; hardware verification required. OWREAD aa uses ROM match and read function 0x33, length minus one; experimental standard slots, compare with I2C before reliance. No full 1-Wire write path. DQ wiring confirmation mandatory. Neither ADC freshness nor timing is validated on hardware.
