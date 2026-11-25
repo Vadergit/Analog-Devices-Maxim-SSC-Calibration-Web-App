@@ -16,6 +16,7 @@ void printHex(uint16_t n,uint8_t digits){for(int i=digits-1;i>=0;--i){uint8_t d=
 uint8_t client=0x4d; char line[96]; size_t pos=0; bool overflow=false;
 struct Reg{uint8_t a,n;uint16_t mask;};
 const Reg regs[]={{0,2,0x600f},{2,2,0},{4,1,63},{5,1,7},{6,2,0},{8,2,0},{10,1,15},{11,2,1023},{13,1,7},{14,1,15},{15,2,0},{17,2,0},{19,1,31},{20,1,7},{21,1,3},{26,2,65535},{28,1,1},{30,1,15},{162,1,0},{163,1,0},{164,1,0},{167,2,0},{169,2,0}};
+const Reg* lookup(unsigned a);
 const Reg* lookup(unsigned a){for(const auto &r:regs)if(r.a==a)return &r;return nullptr;}
 bool rd(uint8_t a,uint8_t n,uint16_t &v){Wire.beginTransmission(client);Wire.write(a);if(Wire.endTransmission(false))return false;if(Wire.requestFrom(client,n)!=n)return false;v=Wire.read();if(n==2)v=(v<<8)|Wire.read();return true;}
 bool wr(uint8_t a,uint8_t n,uint16_t v){Wire.beginTransmission(client);Wire.write(a);if(n==2)Wire.write(uint8_t(v>>8));Wire.write(uint8_t(v));return Wire.endTransmission()==0;}
