@@ -7,3 +7,5 @@
 .adi-classic #guidedWorkspace{max-width:1270px}.adi-classic .gw-shell{grid-template-columns:240px minmax(0,1fr);border-radius:13px;box-shadow:none}.adi-classic .gw-main{padding:20px}.adi-classic .gw-choice{min-height:80px;padding:12px}.adi-classic .gw-title{font-size:20px}.adi-classic .gw-sidebar{padding:16px 10px}
 @media(max-width:790px){.adi-classic .gw-shell{grid-template-columns:1fr}}
 @media print{header,aside,.gw-footer,.gw-topline,.gw-progressbar,.gw-heading-row,button,input,select{display:none!important}#guidedWorkspace .gw-shell{display:block;box-shadow:none;border:0}#guidedWorkspace .gw-page{display:none!important}#guidedWorkspace #gwPage13{display:block!important}#guidedWorkspace pre{max-height:none!important;overflow:visible!important}}
+
+#classicPoints{display:none}.adi-classic #classicPoints{display:block}.adi-classic #guidedPoints{display:none}
