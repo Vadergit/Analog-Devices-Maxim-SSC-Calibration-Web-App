@@ -2,7 +2,7 @@
 
 [Web-App](https://vadergit.github.io/Analog-Devices-Maxim-SSC-Calibration-Web-App/) · [SSC Calibration Studio](https://vadergit.github.io/SSC-Calibration-Studio/)
 
-**v0.2.0 – Laborprototyp, keine Hardwarefreigabe.** Geführte Ansicht nach dem Elmos-Master, inklusive Messmatrix, Brückenrechner, Temperaturkennlinie, Host-Druckmodell bis dritter Ordnung, unabhängiger Nachmessung und Export. MAX40109 ist das Hauptmodell; MAX1454 bleibt als manuelle lineare Host-Auswertung erhalten.
+**v0.3.0 – Laborprototyp, keine Hardwarefreigabe.** Geführte Ansicht nach dem Elmos-Master, inklusive Messmatrix, Brückenrechner, Temperaturkennlinie, Host-Druckmodell bis dritter Ordnung, unabhängiger Nachmessung und Export. MAX40109 ist das Hauptmodell; MAX1454 bleibt als manuelle lineare Host-Auswertung erhalten.
 
 ## Quellen und Abgrenzung
 
@@ -30,3 +30,7 @@ Web Serial (Chrome/Edge, HTTPS oder localhost), 115200 Baud. HELLO prüft Adapte
 4. Speicher-Backup, Schutzbits, Änderungsvergleich, explizite Bestätigung, kontrollierte Programmierung, Rücklesung und Kaltstartprüfung.
 5. MAX1454 separat mit Herstellerverfahren und DAC-/Flash-Treiber implementieren.
 6. Automatisches Logging, Archivimport und eigenständiges PDF-Layout ergänzen. Aktuell CSV/JSON und Browser-Druckansicht.
+
+## Oberflächen-Master
+
+Die originalen Styles `guided.css`, `theme.css`, `interface.css`, `settings-refresh.css` und die eingebetteten CSS-Regeln aus dem Elmos-Master (`master-base.css`) wurden aus Commit `13220433b1bde9b6ff8747f6fecf5262c1f85213` übernommen. Header, acht Aufgabenkacheln, elf Schritte, Presets, Fortschrittsleiste und Dialog orientieren sich an der dortigen DOM-Struktur. Es werden keine Elmos-JavaScript-Treiber geladen. Klassisch ist eine kompaktere Darstellung des gemeinsamen Arbeitsbereichs (noch keine vollständige klassische Elmos-Ansicht). Manuelles Logging und lokales JSON-Archiv sind implementiert, automatisches Logging, Hardwarealarme, TK0-only, NVM, vollständiger EEPROM-Viewer und eigenständiger PDF-Bericht fehlen. Keine visuelle 1:1-Freigabe ohne Browservergleich.
