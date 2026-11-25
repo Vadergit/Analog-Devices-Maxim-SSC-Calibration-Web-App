@@ -14,5 +14,3 @@ export class ReadBridge {
  rom(){return this.run(async()=>verifyRom((await this.exchange('ROM',/^OK ROM [0-9A-F]{16}$/)).slice(7)));}
  shadow(a,v){if(!Number.isInteger(a)||a<8||a>39||!Number.isInteger(v)||v<0||v>65535)throw Error('Nur Druckkoeffizienten im Shadow');return this.run(async()=>{const reply=await this.exchange('SHADOW '+hex(a)+' '+hex(v,4),new RegExp('^OK SHADOW '+hex(a)+' [0-9A-F]{4}$'));return parseInt(reply.slice(-4),16);});}
 }
-))).slice(-4),16));}
-}
