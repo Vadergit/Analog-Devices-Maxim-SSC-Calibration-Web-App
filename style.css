@@ -9,3 +9,7 @@
 @media print{header,aside,.gw-footer,.gw-topline,.gw-progressbar,.gw-heading-row,button,input,select{display:none!important}#guidedWorkspace .gw-shell{display:block;box-shadow:none;border:0}#guidedWorkspace .gw-page{display:none!important}#guidedWorkspace #gwPage13{display:block!important}#guidedWorkspace pre{max-height:none!important;overflow:visible!important}}
 
 #classicPoints{display:none}.adi-classic #classicPoints{display:block}.adi-classic #guidedPoints{display:none}
+
+/* The master toggles this button with its own view controller; our controller always exposes it. */
+html.guided-active #guidedHomeTop{display:inline-flex!important;align-items:center}
+#guidedWorkspace .gw-tile+.gw-tile{margin-top:12px}

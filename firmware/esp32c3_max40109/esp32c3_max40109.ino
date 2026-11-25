@@ -11,12 +11,25 @@ bool wr(uint8_t a,uint8_t n,uint16_t v){Wire.beginTransmission(client);Wire.writ
 void error(const char* e){Serial.print("ERR ");Serial.println(e);}
 bool dump(uint16_t *d){uint16_t c,ctrl;if(!rd(0,2,c)||(c&0x8000)||!rd(0xa2,1,ctrl)||ctrl!=0)return false;if(!wr(0xa2,1,0x10))return false;bool ok=true;for(uint8_t i=0;i<69;i++){if(!wr(0xa4,1,i)||!rd(0xa7,2,d[i])){ok=false;break;}}if(!wr(0xa2,1,0))ok=false;return ok;}
 bool parseHex(const char* p,unsigned n,unsigned &v){v=0;for(unsigned i=0;i<n;i++){char c=p[i];unsigned d=c>='0'&&c<='9'?c-'0':c>='A'&&c<='F'?c-'A'+10:99;if(d>15)return false;v=v*16+d;}return true;}
+constexpr uint8_t DQ=6;
+void dqLow(){digitalWrite(DQ,LOW);pinMode(DQ,OUTPUT_OPEN_DRAIN);}
+void dqRelease(){pinMode(DQ,INPUT);}
+bool owReset(){dqRelease();delayMicroseconds(5);if(!digitalRead(DQ))return false;dqLow();delayMicroseconds(500);dqRelease();delayMicroseconds(70);bool presence=!digitalRead(DQ);delayMicroseconds(430);return presence&&digitalRead(DQ);}
+void owWriteBit(bool bit){dqLow();delayMicroseconds(bit?5:65);dqRelease();delayMicroseconds(bit?65:5);}
+bool owReadBit(){dqLow();delayMicroseconds(3);dqRelease();delayMicroseconds(10);bool bit=digitalRead(DQ);delayMicroseconds(57);return bit;}
+void owWrite(uint8_t b){for(int i=0;i<8;i++)owWriteBit((b>>i)&1);}
+uint8_t owRead(){uint8_t b=0;for(int i=0;i<8;i++)if(owReadBit())b|=1<<i;return b;}
+uint8_t crc8(const uint8_t *b,size_t n){uint8_t c=0;while(n--){uint8_t x=*b++;for(int i=0;i<8;i++){bool z=(c^x)&1;c>>=1;if(z)c^=0x8c;x>>=1;}}return c;}
+bool readRom(uint8_t *b){if(!owReset())return false;owWrite(0x33);for(int i=0;i<8;i++)b[i]=owRead();return b[0]==0x76&&crc8(b,8)==0;}
+bool shadowWrite(uint8_t a,uint16_t value,uint16_t &actual){uint16_t c,ctrl;if(a<8||a>39||!rd(0,2,c)||(c&0x8000)||!rd(0xa2,1,ctrl)||ctrl!=0)return false;if(!wr(0xa2,1,0x10))return false;bool ok=wr(0xa4,1,a)&&wr(0xa5,2,value)&&rd(0xa7,2,actual)&&actual==value;if(!wr(0xa2,1,0))ok=false;return ok;}
 void command(){unsigned a,m,v;uint16_t old,actual;
- if(!strcmp(line,"HELLO")){Serial.println("MAX40109-RO 2");return;}
+ if(!strcmp(line,"HELLO")){Serial.println("MAX40109-RO 3");return;}
  if(strlen(line)==8&&!strncmp(line,"PROBE ",6)&&parseHex(line+6,2,a)&&a>=8&&a<=119){client=a;if(!rd(0,2,old)){error("I2C no response");return;}Serial.printf("OK PROBE %02X\n",a);return;}
  if(strlen(line)==7&&!strncmp(line,"READ ",5)&&parseHex(line+5,2,a)){auto r=lookup(a);if(!r||!rd(a,r->n,old)){error("read");return;}Serial.printf("OK %02X %04X\n",a,old);return;}
+ if(!strcmp(line,"ROM")){uint8_t b[8];if(!readRom(b)){error("ROM presence/family/CRC");return;}Serial.print("OK ROM ");for(auto v:b)Serial.printf("%02X",v);Serial.println();return;}
+ if(strlen(line)==14&&!strncmp(line,"SHADOW ",7)&&line[9]==' '&&parseHex(line+7,2,a)&&parseHex(line+10,4,v)){if(!shadowWrite(a,v,actual)){error("shadow write/readback; power cycle required if uncertain");return;}Serial.printf("OK SHADOW %02X %04X\n",a,actual);return;}
  if(!strcmp(line,"DUMP")){uint16_t d[69];if(!dump(d)){error("MTP read; check mode/configuration");return;}Serial.print("OK DUMP");for(auto w:d)Serial.printf(" %04X",w);Serial.println();return;}
  if(strlen(line)==18&&!strncmp(line,"PATCH ",6)&&line[8]==' '&&line[13]==' '&&parseHex(line+6,2,a)&&parseHex(line+9,4,m)&&parseHex(line+14,4,v)){auto r=lookup(a);if(!r||!m||(m&~r->mask)||(v&~m)||!rd(a,r->n,old)){error("mask or read");return;}uint16_t target=(old&~m)|v;if((a==0&&(target&0x6000)==0x6000)||(a==4&&(target&63)>19)||(a==30&&(target&15)==1)){error("reserved setting");return;}if(!wr(a,r->n,target)||!rd(a,r->n,actual)||actual!=target){error("RAM write/readback; state uncertain");return;}Serial.printf("OK PATCH %02X %04X\n",a,actual);return;}
  error("unsupported");}
-void setup(){Serial.begin(115200);Wire.begin(4,5,100000);Wire.setTimeOut(100);}
+void setup(){Serial.begin(115200);dqRelease();Wire.begin(4,5,100000);Wire.setTimeOut(100);}
 void loop(){while(Serial.available()){char c=Serial.read();if(c=='\r')continue;if(c=='\n'){line[pos]=0;if(overflow)error("length");else command();pos=0;overflow=false;}else if(pos<sizeof(line)-1)line[pos++]=c;else overflow=true;}}
